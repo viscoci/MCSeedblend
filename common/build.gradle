@@ -1,0 +1,26 @@
+plugins {
+    id 'net.neoforged.moddev'
+}
+
+neoForge {
+    // Vanilla-only (NeoForm) — common compiles against Mojang-mapped Minecraft with no loader.
+    neoFormVersion = rootProject.neoform_version
+
+    addModdingDependenciesTo(sourceSets.test)
+}
+
+dependencies {
+    compileOnly "org.spongepowered:mixin:0.8.7"
+
+    testImplementation platform('org.junit:junit-bom:5.10.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat 'full'
+    }
+}
