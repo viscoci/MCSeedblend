@@ -3,6 +3,8 @@ package com.bondigi.seedblend.chunk;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 
+import java.util.Optional;
+
 /**
  * Creates and validates the vanilla {@code blending_data} compound. Only the vertical
  * bounds are synthesized; height arrays are left for vanilla to calculate lazily, which
@@ -21,16 +23,14 @@ public final class BlendingDataFactory {
 
     /**
      * A decodable compound needs numeric {@code min_section} and {@code max_section}
-     * with min < max. Anything else fails {@code BlendingData.CODEC} in 1.21.1.
+     * with min < max. Anything else fails {@code BlendingData.Packed.CODEC} in 26.1.
      */
     public static boolean isValid(Tag tag) {
         if (!(tag instanceof CompoundTag compound)) {
             return false;
         }
-        if (!compound.contains(ChunkNbtKeys.MIN_SECTION, Tag.TAG_ANY_NUMERIC)
-                || !compound.contains(ChunkNbtKeys.MAX_SECTION, Tag.TAG_ANY_NUMERIC)) {
-            return false;
-        }
-        return compound.getInt(ChunkNbtKeys.MIN_SECTION) < compound.getInt(ChunkNbtKeys.MAX_SECTION);
+        Optional<Integer> min = compound.getInt(ChunkNbtKeys.MIN_SECTION);
+        Optional<Integer> max = compound.getInt(ChunkNbtKeys.MAX_SECTION);
+        return min.isPresent() && max.isPresent() && min.get() < max.get();
     }
 }

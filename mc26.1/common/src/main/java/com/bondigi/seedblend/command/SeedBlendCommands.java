@@ -29,16 +29,15 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 
-import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The /seedblend command tree (spec §13). All modifying commands require permission
- * level 4. Command implementations are loader-agnostic; each loader module only
- * registers the tree with its own callback.
+ * The /seedblend command tree (spec §13). All modifying commands require owner-level
+ * permission (the 26.1 equivalent of permission level 4). Command implementations are
+ * loader-agnostic; each loader module only registers the tree with its own callback.
  */
 public final class SeedBlendCommands {
     private static final PlanTokenService PLAN_TOKENS = new PlanTokenService();
@@ -48,7 +47,7 @@ public final class SeedBlendCommands {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("seedblend")
-                .requires(source -> source.hasPermission(4))
+                .requires(Commands.hasPermission(Commands.LEVEL_OWNERS))
                 .then(Commands.literal("status").executes(SeedBlendCommands::status))
                 .then(Commands.literal("plan")
                         .then(Commands.argument("seed", StringArgumentType.greedyString())
@@ -82,7 +81,7 @@ public final class SeedBlendCommands {
     private static int status(CommandContext<CommandSourceStack> ctx) {
         MinecraftServer server = ctx.getSource().getServer();
         SeedBlendWorldState state = StartupSeedTransaction.worldState();
-        long levelSeed = server.getWorldData().worldGenOptions().seed();
+        long levelSeed = StartupSeedTransaction.levelSeed(server);
         StringBuilder out = new StringBuilder("SeedBlend status\n");
 
         if (state == null) {
@@ -103,7 +102,7 @@ public final class SeedBlendCommands {
                 out.append("Restart required: no\n");
             }
             if (levelSeed != state.activeSeed()) {
-                out.append("WARNING: level.dat seed ").append(levelSeed)
+                out.append("WARNING: world seed ").append(levelSeed)
                         .append(" disagrees with SeedBlend state ").append(state.activeSeed()).append('\n');
             }
         }
@@ -127,7 +126,7 @@ public final class SeedBlendCommands {
         long newSeed = parsed.getAsLong();
 
         SeedBlendWorldState state = StartupSeedTransaction.worldState();
-        long currentSeed = state != null ? state.activeSeed() : server.getWorldData().worldGenOptions().seed();
+        long currentSeed = state != null ? state.activeSeed() : StartupSeedTransaction.levelSeed(server);
         long currentEpoch = state != null ? state.activeEpoch() : 0L;
 
         if (newSeed == currentSeed) {
@@ -182,7 +181,7 @@ public final class SeedBlendCommands {
 
         if (state == null) {
             // First ever reseed on this world: adopt it (fingerprint from the original seed).
-            long originalSeed = server.getWorldData().worldGenOptions().seed();
+            long originalSeed = StartupSeedTransaction.levelSeed(server);
             String levelName = server.getWorldData().getLevelName();
             state = new SeedBlendWorldState(WorldFingerprint.compute(originalSeed, levelName), originalSeed);
         } else if (state.pendingTransaction() != null) {
@@ -241,7 +240,7 @@ public final class SeedBlendCommands {
 
         StringBuilder out = new StringBuilder();
         out.append("Chunk [").append(x).append(", ").append(z).append("] in ")
-                .append(level.dimension().location()).append('\n');
+                .append(level.dimension().identifier()).append('\n');
         if (maybeTag.isEmpty()) {
             out.append("Not generated (no serialized data). Inspect does not generate chunks.");
             reply(ctx, out.toString());
@@ -255,7 +254,7 @@ public final class SeedBlendCommands {
         boolean wouldInject = cls == EpochPolicy.Classification.OLD && complete
                 && policy.blendingSupported() && !hasBlending;
 
-        out.append("Status: ").append(tag.getString(ChunkNbtKeys.STATUS)).append('\n');
+        out.append("Status: ").append(tag.getStringOr(ChunkNbtKeys.STATUS, "?")).append('\n');
         out.append("Serialized generation epoch: ").append(chunkEpoch)
                 .append(tag.contains(ChunkNbtKeys.SEEDBLEND) ? "" : " (no metadata — implicit epoch 0)").append('\n');
         out.append("Active epoch: ").append(activeEpoch).append('\n');
@@ -295,13 +294,13 @@ public final class SeedBlendCommands {
         }
 
         // Seed consistency.
-        long levelSeed = server.getWorldData().worldGenOptions().seed();
+        long levelSeed = StartupSeedTransaction.levelSeed(server);
         long expected = memory != null ? memory.activeSeed() : levelSeed;
         if (levelSeed == expected) {
-            out.append("[ok] level.dat seed matches active seed (").append(levelSeed).append(")\n");
+            out.append("[ok] world seed matches active seed (").append(levelSeed).append(")\n");
         } else {
             ok = false;
-            out.append("[FAIL] level.dat seed ").append(levelSeed)
+            out.append("[FAIL] world seed ").append(levelSeed)
                     .append(" != active seed ").append(expected).append('\n');
         }
 
@@ -321,7 +320,7 @@ public final class SeedBlendCommands {
         for (ServerLevel level : server.getAllLevels()) {
             DimensionBlendPolicy policy = DimensionPolicyFactory.of(level);
             out.append(policy.blendingSupported() ? "[ok] " : "[info] ")
-                    .append(level.dimension().location())
+                    .append(level.dimension().identifier())
                     .append(policy.blendingSupported() ? " supports blending\n" : " not blended\n");
         }
 

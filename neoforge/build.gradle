@@ -8,6 +8,7 @@ neoForge {
     runs {
         server {
             server()
+            gameDirectory = project.file('run')
         }
     }
 
@@ -21,6 +22,11 @@ neoForge {
 
 dependencies {
     compileOnly project(':common')
+}
+
+// Let the integration fixture (and humans) type into the dev-server console.
+tasks.named('runServer') {
+    standardInput = System.in
 }
 
 // Compile the common sources into this loader's jar (MultiLoader pattern).

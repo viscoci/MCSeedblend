@@ -4,7 +4,7 @@ import com.bondigi.seedblend.SeedBlend;
 import com.bondigi.seedblend.config.SeedBlendConfig;
 import com.bondigi.seedblend.core.SeedBlendRuntime;
 import com.bondigi.seedblend.core.SeedBlendRuntimeState;
-import com.bondigi.seedblend.mixin.PrimaryLevelDataAccessor;
+import com.bondigi.seedblend.mixin.WorldGenSettingsAccessor;
 import com.bondigi.seedblend.state.PendingTransaction;
 import com.bondigi.seedblend.state.SeedBlendStateException;
 import com.bondigi.seedblend.state.SeedBlendWorldState;
@@ -13,10 +13,9 @@ import com.bondigi.seedblend.state.WorldFingerprint;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.WorldGenSettings;
 import net.minecraft.world.level.levelgen.WorldOptions;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraft.world.level.storage.PrimaryLevelData;
-import net.minecraft.world.level.storage.WorldData;
 
 import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
@@ -29,6 +28,9 @@ import java.util.Set;
  * any {@code ServerLevel} exists (before {@code RandomState}, structure state, noise
  * routers are built); {@link #onServerStarted} verifies and finalizes; the whole flow is
  * idempotent — a crash before finalization leaves the STAGED transaction to retry.
+ *
+ * <p>26.1: the canonical seed lives in the {@code WorldGenSettings} SavedData rather
+ * than level.dat's WorldOptions.
  */
 public final class StartupSeedTransaction {
     /** State loaded during the current startup; null when the mod is passive. */
@@ -58,6 +60,10 @@ public final class StartupSeedTransaction {
         return server.getWorldPath(LevelResource.ROOT);
     }
 
+    public static long levelSeed(MinecraftServer server) {
+        return server.getWorldGenSettings().options().seed();
+    }
+
     /**
      * Pre-level hook. Fired by loader events that run before {@code createLevels}
      * (Fabric SERVER_STARTING / NeoForge ServerAboutToStartEvent) on both dedicated and
@@ -78,9 +84,8 @@ public final class StartupSeedTransaction {
         }
 
         SeedBlendWorldState state = loaded.get();
-        WorldData worldData = server.getWorldData();
-        String levelName = worldData.getLevelName();
-        long levelSeed = worldData.worldGenOptions().seed();
+        String levelName = server.getWorldData().getLevelName();
+        long levelSeed = levelSeed(server);
 
         // Fail closed: state file copied from an unrelated world (spec §7, §19).
         if (!WorldFingerprint.matches(state, levelName)) {
@@ -97,7 +102,7 @@ public final class StartupSeedTransaction {
                         + state.activeEpoch() + " — state is inconsistent, refusing to start.");
             }
             if (levelSeed != state.activeSeed() && levelSeed != pending.targetSeed()) {
-                throw new SeedBlendStateException("level.dat seed " + levelSeed
+                throw new SeedBlendStateException("World seed " + levelSeed
                         + " matches neither the active seed " + state.activeSeed()
                         + " nor the staged seed " + pending.targetSeed() + " — refusing to start.");
             }
@@ -109,7 +114,7 @@ public final class StartupSeedTransaction {
         } else {
             applying = null;
             if (levelSeed != state.activeSeed()) {
-                throw new SeedBlendStateException("level.dat seed " + levelSeed
+                throw new SeedBlendStateException("World seed " + levelSeed
                         + " differs from the SeedBlend active seed " + state.activeSeed()
                         + " — world and state file are out of sync, refusing to start.");
             }
@@ -126,18 +131,14 @@ public final class StartupSeedTransaction {
 
     /**
      * Replace the canonical world seed before any world-generation object is built.
-     * The normal save process later persists it to level.dat.
+     * Marking the SavedData dirty persists the new seed through the normal save path.
      */
     private static void applySeed(MinecraftServer server, long newSeed) {
-        WorldData worldData = server.getWorldData();
-        if (!(worldData instanceof PrimaryLevelData primary)) {
-            throw new SeedBlendStateException("World data is " + worldData.getClass().getName()
-                    + ", not PrimaryLevelData — cannot apply the pending seed before generator "
-                    + "initialization. Refusing to start (spec §19).");
-        }
-        WorldOptions old = worldData.worldGenOptions();
+        WorldGenSettings settings = server.getWorldGenSettings();
+        WorldOptions old = settings.options();
         WorldOptions replaced = new WorldOptions(newSeed, old.generateStructures(), old.generateBonusChest());
-        ((PrimaryLevelDataAccessor) (Object) primary).seedblend$setWorldOptions(replaced);
+        ((WorldGenSettingsAccessor) (Object) settings).seedblend$setOptions(replaced);
+        settings.setDirty();
     }
 
     /**
@@ -152,16 +153,16 @@ public final class StartupSeedTransaction {
         }
 
         long expectedSeed = applying != null ? applying.targetSeed() : state.activeSeed();
-        long actual = server.getWorldData().worldGenOptions().seed();
+        long actual = levelSeed(server);
         if (actual != expectedSeed) {
-            throw new SeedBlendStateException("Post-start verification failed: world data seed "
+            throw new SeedBlendStateException("Post-start verification failed: world seed "
                     + actual + " != expected seed " + expectedSeed);
         }
         for (ServerLevel level : server.getAllLevels()) {
             long structureSeed = level.getChunkSource().getGeneratorState().getLevelSeed();
             if (structureSeed != expectedSeed) {
                 throw new SeedBlendStateException("Post-start verification failed: dimension "
-                        + level.dimension().location() + " structure state uses seed " + structureSeed
+                        + level.dimension().identifier() + " structure state uses seed " + structureSeed
                         + " != expected " + expectedSeed
                         + ". The selected seed is not active; refusing to continue (spec §19).");
             }
@@ -193,7 +194,7 @@ public final class StartupSeedTransaction {
         SeedBlend.LOGGER.info("[SeedBlend] Nether and End blending are disabled");
         if (SeedBlendRuntime.config().warnOnUnsupportedDimensions) {
             for (ServerLevel level : server.getAllLevels()) {
-                String id = level.dimension().location().toString();
+                String id = level.dimension().identifier().toString();
                 if (runtime != null && !runtime.isBlendingDimension(id) && level.dimension() != Level.OVERWORLD) {
                     SeedBlend.LOGGER.warn(
                             "[SeedBlend] Dimension {} is not blended; future chunks there still use the new seed",
@@ -211,8 +212,6 @@ public final class StartupSeedTransaction {
     }
 
     private static Path configDir(MinecraftServer server) {
-        // Both loaders run with the game directory as working directory; the config
-        // directory is resolved by the loader entrypoint and passed in via ConfigDirHolder.
         return ConfigDirHolder.get();
     }
 

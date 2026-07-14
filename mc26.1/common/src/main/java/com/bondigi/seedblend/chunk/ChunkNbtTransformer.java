@@ -6,19 +6,20 @@ import com.bondigi.seedblend.core.SeedBlendRuntime;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 
+import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
  * Pure transformation of serialized chunk NBT at load time (spec §9). Operates on the
- * chunk root compound before vanilla decodes it into a {@code ProtoChunk}/{@code LevelChunk}.
+ * chunk root compound before vanilla decodes it via {@code SerializableChunkData.parse}.
  * Thread-safe: no shared mutable state beyond {@link SeedBlendRuntime} counters; the tag
  * instance is owned by the calling I/O thread.
  */
 public final class ChunkNbtTransformer {
     /**
-     * The completed-status threshold. Verified against the 1.21.1 chunk serializer
-     * (see docs/source-audit-1.21.1.md): only status {@code minecraft:full} deserializes
-     * to a LevelChunk; every earlier status is generation-incomplete.
+     * The completed-status threshold. Verified against the 26.1 chunk serializer
+     * (see docs/source-audit-26.1.md): only status {@code minecraft:full} has
+     * ChunkType.LEVELCHUNK; every earlier status is generation-incomplete.
      */
     private static final String FULL_STATUS = "minecraft:full";
 
@@ -77,21 +78,21 @@ public final class ChunkNbtTransformer {
             SeedBlendRuntime.CHUNKS_MISSING_METADATA.increment();
             return OptionalLong.empty();
         }
-        if (!chunkTag.contains(ChunkNbtKeys.SEEDBLEND, Tag.TAG_COMPOUND)) {
+        Optional<CompoundTag> seedblend = chunkTag.getCompound(ChunkNbtKeys.SEEDBLEND);
+        if (seedblend.isEmpty()) {
             malformed("seedblend tag is not a compound");
             return OptionalLong.empty();
         }
-        CompoundTag seedblend = chunkTag.getCompound(ChunkNbtKeys.SEEDBLEND);
-        if (!seedblend.contains(ChunkNbtKeys.GENERATION_EPOCH, Tag.TAG_ANY_NUMERIC)) {
+        Optional<Long> epoch = seedblend.get().getLong(ChunkNbtKeys.GENERATION_EPOCH);
+        if (epoch.isEmpty()) {
             malformed("generation_epoch missing or non-numeric");
             return OptionalLong.empty();
         }
-        long epoch = seedblend.getLong(ChunkNbtKeys.GENERATION_EPOCH);
-        if (epoch < 0) {
-            malformed("negative generation_epoch " + epoch);
+        if (epoch.get() < 0) {
+            malformed("negative generation_epoch " + epoch.get());
             return OptionalLong.empty();
         }
-        return OptionalLong.of(epoch);
+        return OptionalLong.of(epoch.get());
     }
 
     private static void malformed(String reason) {
@@ -100,11 +101,11 @@ public final class ChunkNbtTransformer {
     }
 
     /**
-     * Whether the serialized status is the completed status. In 1.21.1 the serializer
+     * Whether the serialized status is the completed status. In 26.1 the serializer
      * writes the status registry id; only FULL round-trips as a LevelChunk.
      */
     public static boolean isStatusComplete(CompoundTag chunkTag) {
-        String status = chunkTag.getString(ChunkNbtKeys.STATUS);
+        String status = chunkTag.getStringOr(ChunkNbtKeys.STATUS, "");
         if (status.isEmpty()) {
             return false;
         }
@@ -137,10 +138,10 @@ public final class ChunkNbtTransformer {
      * epochs are immutable — this only fills in absent/malformed metadata (spec §4.3).
      */
     public static void ensureSeedBlendMetadata(CompoundTag chunkTag, long epoch) {
-        if (chunkTag.contains(ChunkNbtKeys.SEEDBLEND, Tag.TAG_COMPOUND)) {
-            CompoundTag existing = chunkTag.getCompound(ChunkNbtKeys.SEEDBLEND);
-            if (existing.contains(ChunkNbtKeys.GENERATION_EPOCH, Tag.TAG_ANY_NUMERIC)
-                    && existing.getLong(ChunkNbtKeys.GENERATION_EPOCH) >= 0) {
+        Optional<CompoundTag> existing = chunkTag.getCompound(ChunkNbtKeys.SEEDBLEND);
+        if (existing.isPresent()) {
+            Optional<Long> current = existing.get().getLong(ChunkNbtKeys.GENERATION_EPOCH);
+            if (current.isPresent() && current.get() >= 0) {
                 return;
             }
         }

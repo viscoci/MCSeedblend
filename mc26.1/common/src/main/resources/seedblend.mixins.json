@@ -9,9 +9,9 @@
   "mixins": [
     "ChunkAccessMixin",
     "ChunkMapMixin",
-    "ChunkSerializerMixin",
+    "SerializableChunkDataMixin",
     "LevelChunkMixin",
-    "PrimaryLevelDataAccessor"
+    "WorldGenSettingsAccessor"
   ],
   "server": [
   ]

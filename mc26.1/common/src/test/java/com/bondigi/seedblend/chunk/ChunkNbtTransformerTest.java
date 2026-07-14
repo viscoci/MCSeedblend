@@ -1,6 +1,7 @@
 package com.bondigi.seedblend.chunk;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +54,7 @@ class ChunkNbtTransformerTest {
         CompoundTag tag = withEpoch(chunk("minecraft:full"), 1);
         assertEquals(ChunkReadResult.LOAD, ChunkNbtTransformer.process(tag, OVERWORLD, 1));
         assertFalse(tag.contains(ChunkNbtKeys.BLENDING_DATA), "current chunks never get synthetic blending");
-        assertEquals(1L, tag.getCompound(ChunkNbtKeys.SEEDBLEND).getLong(ChunkNbtKeys.GENERATION_EPOCH));
+        assertEquals(1L, tag.getCompoundOrEmpty(ChunkNbtKeys.SEEDBLEND).getLongOr(ChunkNbtKeys.GENERATION_EPOCH, -1));
     }
 
     // --- old completed chunk becomes blending source (spec §9) ---
@@ -63,14 +64,14 @@ class ChunkNbtTransformerTest {
         CompoundTag tag = chunk("minecraft:full"); // pre-SeedBlend chunk, epoch 0
         assertEquals(ChunkReadResult.LOAD, ChunkNbtTransformer.process(tag, OVERWORLD, 1));
 
-        CompoundTag blending = tag.getCompound(ChunkNbtKeys.BLENDING_DATA);
-        assertEquals(-4, blending.getInt(ChunkNbtKeys.MIN_SECTION), "dimension-true min section");
-        assertEquals(20, blending.getInt(ChunkNbtKeys.MAX_SECTION), "dimension-true exclusive max section");
+        CompoundTag blending = tag.getCompoundOrEmpty(ChunkNbtKeys.BLENDING_DATA);
+        assertEquals(-4, blending.getIntOr(ChunkNbtKeys.MIN_SECTION, 99), "dimension-true min section");
+        assertEquals(20, blending.getIntOr(ChunkNbtKeys.MAX_SECTION, 99), "dimension-true exclusive max section");
 
         // Epoch metadata written, preserving the ORIGINAL epoch — epochs are immutable.
-        CompoundTag meta = tag.getCompound(ChunkNbtKeys.SEEDBLEND);
-        assertEquals(0L, meta.getLong(ChunkNbtKeys.GENERATION_EPOCH));
-        assertEquals(1, meta.getInt(ChunkNbtKeys.SCHEMA));
+        CompoundTag meta = tag.getCompoundOrEmpty(ChunkNbtKeys.SEEDBLEND);
+        assertEquals(0L, meta.getLongOr(ChunkNbtKeys.GENERATION_EPOCH, -1));
+        assertEquals(1, meta.getIntOr(ChunkNbtKeys.SCHEMA, -1));
     }
 
     @Test
@@ -79,7 +80,7 @@ class ChunkNbtTransformerTest {
         CompoundTag tag = withEpoch(chunk("minecraft:full"), 1);
         assertEquals(ChunkReadResult.LOAD, ChunkNbtTransformer.process(tag, OVERWORLD, 2));
         assertTrue(tag.contains(ChunkNbtKeys.BLENDING_DATA));
-        assertEquals(1L, tag.getCompound(ChunkNbtKeys.SEEDBLEND).getLong(ChunkNbtKeys.GENERATION_EPOCH));
+        assertEquals(1L, tag.getCompoundOrEmpty(ChunkNbtKeys.SEEDBLEND).getLongOr(ChunkNbtKeys.GENERATION_EPOCH, -1));
     }
 
     // --- existing blending data preserved (spec §9) ---
@@ -92,16 +93,16 @@ class ChunkNbtTransformerTest {
         existing.putInt(ChunkNbtKeys.MAX_SECTION, 20);
         ListTag heights = new ListTag();
         for (int i = 0; i < 4; i++) {
-            heights.add(net.minecraft.nbt.DoubleTag.valueOf(63.5));
+            heights.add(DoubleTag.valueOf(63.5));
         }
         existing.put("heights", heights);
         tag.put(ChunkNbtKeys.BLENDING_DATA, existing);
 
         ChunkNbtTransformer.process(tag, OVERWORLD, 1);
 
-        CompoundTag after = tag.getCompound(ChunkNbtKeys.BLENDING_DATA);
+        CompoundTag after = tag.getCompoundOrEmpty(ChunkNbtKeys.BLENDING_DATA);
         assertTrue(after.contains("heights"), "calculated height arrays must be preserved");
-        assertEquals(4, after.getList("heights", net.minecraft.nbt.Tag.TAG_DOUBLE).size());
+        assertEquals(4, after.getListOrEmpty("heights").size());
     }
 
     @Test
@@ -111,9 +112,9 @@ class ChunkNbtTransformerTest {
 
         ChunkNbtTransformer.process(tag, OVERWORLD, 1);
 
-        CompoundTag after = tag.getCompound(ChunkNbtKeys.BLENDING_DATA);
-        assertEquals(-4, after.getInt(ChunkNbtKeys.MIN_SECTION));
-        assertEquals(20, after.getInt(ChunkNbtKeys.MAX_SECTION));
+        CompoundTag after = tag.getCompoundOrEmpty(ChunkNbtKeys.BLENDING_DATA);
+        assertEquals(-4, after.getIntOr(ChunkNbtKeys.MIN_SECTION, 99));
+        assertEquals(20, after.getIntOr(ChunkNbtKeys.MAX_SECTION, 99));
     }
 
     @Test
@@ -141,7 +142,7 @@ class ChunkNbtTransformerTest {
 
     @Test
     void oldIncompleteChunksDiscarded() {
-        // Every pre-FULL status in the 1.21.1 generation pipeline.
+        // Every pre-FULL status in the 26.1 generation pipeline.
         String[] incomplete = {
                 "minecraft:empty", "minecraft:structure_starts", "minecraft:structure_references",
                 "minecraft:biomes", "minecraft:noise", "minecraft:surface", "minecraft:carvers",
@@ -187,6 +188,6 @@ class ChunkNbtTransformerTest {
 
         // process() repairs the malformed compound with epoch 0.
         ChunkNbtTransformer.process(tag2, OVERWORLD, 0);
-        assertEquals(0L, tag2.getCompound(ChunkNbtKeys.SEEDBLEND).getLong(ChunkNbtKeys.GENERATION_EPOCH));
+        assertEquals(0L, tag2.getCompoundOrEmpty(ChunkNbtKeys.SEEDBLEND).getLongOr(ChunkNbtKeys.GENERATION_EPOCH, -1));
     }
 }

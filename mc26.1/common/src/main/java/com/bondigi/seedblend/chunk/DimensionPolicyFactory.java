@@ -16,12 +16,13 @@ public final class DimensionPolicyFactory {
     }
 
     public static DimensionBlendPolicy of(ServerLevel level) {
-        String id = level.dimension().location().toString();
+        String id = level.dimension().identifier().toString();
         SeedBlendRuntimeState runtime = SeedBlendRuntime.state();
         boolean supported = runtime != null
                 && runtime.isBlendingDimension(id)
                 && generatorCompatible(level.getChunkSource().getGenerator());
-        return new DimensionBlendPolicy(id, supported, level.getMinSection(), level.getMaxSection());
+        // 26.1: getMaxSectionY() is inclusive; BlendingData bounds use an exclusive max.
+        return new DimensionBlendPolicy(id, supported, level.getMinSectionY(), level.getMaxSectionY() + 1);
     }
 
     private static boolean generatorCompatible(ChunkGenerator generator) {
