@@ -26,12 +26,20 @@ Rules of the codebase (from the spec — read `OG_SPEC.md` before changing behav
 Requires JDK 21 (JDK 25 for `mc26.1/`). Gradle toolchains resolve automatically.
 
 ```
-./gradlew build                 # builds fabric + neoforge jars, runs unit tests
+./gradlew build                 # builds fabric + neoforge 1.21.1 jars, runs unit tests
 ./gradlew :common:test          # unit tests only
-powershell -File fixture/reseed-fixture.ps1   # full integration cycle (~10 min, boots 4 servers)
+cd mc26.1 && ./gradlew build    # Minecraft 26.1 artifacts + tests (Java 25)
+
+# Integration fixture (~5 min per run, boots 4 dedicated servers via RCON):
+powershell -File fixture/reseed-fixture.ps1                      # 1.21.1 Fabric
+powershell -File fixture/reseed-fixture.ps1 -Loader neoforge     # 1.21.1 NeoForge
+powershell -File fixture/reseed-fixture.ps1 -ProjectSubdir mc26.1 -JavaHome <jdk25>            # 26.1 Fabric
+powershell -File fixture/reseed-fixture.ps1 -Loader neoforge -ProjectSubdir mc26.1 -JavaHome <jdk25>  # 26.1 NeoForge
 ```
 
-The integration fixture must pass before a release: it drives plan → commit → restart → blending/epoch verification → second reseed on a real dedicated server.
+The integration fixture must pass on both loaders before a release: it drives plan →
+commit → restart → blending/epoch verification → second reseed (44 assertions) on a
+real dedicated server.
 
 ## Version support
 

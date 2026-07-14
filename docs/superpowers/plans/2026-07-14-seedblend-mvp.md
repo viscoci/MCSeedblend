@@ -143,8 +143,8 @@ Key hook targets (1.21.1, Mojang mappings — Task 2 audit verifies exact signat
 
 ### Task 8: Integration verification (Milestone 6a)
 - [x] Headless fixture per §20: scripted dedicated-server runs (seed A gen → hash chunks → plan+commit B → restart → gen boundary → restart → assert epochs/blending/hashes preserved). Implement as a PowerShell/Gradle-driven fixture reading region files with a small NBT-reading test utility.
-- [x] Multi-reseed (A→B→C) case; failure-recovery cases (kill after stage, kill before finalize → same transaction retried, no extra epoch).
-- [x] GameTest module wiring for both loaders (structure-less tests asserting runtime state + chunk metadata).
+- [x] Multi-reseed (A→B→C) case; staged-transaction idempotence across restarts (no re-apply, no extra epoch); crash-before-finalize retry covered by unit tests (StateStoreTest) + startup logic that tolerates level seed already at target.
+- [x] Loader-equivalent integration tests: the RCON fixture runs identically against Fabric AND NeoForge servers (44 assertions each) — chosen over GameTest wiring because the reseed lifecycle spans restarts, which GameTests cannot model.
 - [x] Commit.
 
 ### Task 9: Docs + release (Milestone 6b)

@@ -13,4 +13,5 @@ Initial release.
 - `/seedblend status | plan | commit | cancel | inspect chunk | verify`
 - `config/seedblend.json` (supported dimensions, discard/persist toggles)
 - Diagnostics counters + SLF4J logging, no telemetry
-- Loaders: Fabric and NeoForge for Minecraft 1.21.1 (Java 21); Minecraft 26.1 build under `mc26.1/`
+- Loaders: Fabric and NeoForge for Minecraft 1.21.1 (Java 21) and Minecraft 26.1 (Java 25, `mc26.1/`)
+- All four loader/version artifacts verified end-to-end by the RCON integration fixture (44 assertions each: plan/commit/restart/blend/multi-reseed)
