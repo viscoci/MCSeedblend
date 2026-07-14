@@ -45,6 +45,15 @@ public final class StartupSeedTransaction {
         return worldState;
     }
 
+    /**
+     * The first {@code /seedblend commit} on a previously passive world creates state at
+     * runtime; adopt it so status/cancel see it. Chunk hooks stay passive until restart —
+     * the runtime state is only ever published during startup (spec §17).
+     */
+    public static void adoptState(SeedBlendWorldState state) {
+        worldState = state;
+    }
+
     public static Path worldDir(MinecraftServer server) {
         return server.getWorldPath(LevelResource.ROOT);
     }
