@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+!.vscode/settings.json
+.classpath
+.project
+.settings/
+bin/
+
+# Loom / mod dev runtime
+run/
+runs/
+run-data/
+logs/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local env
+*.local.json
