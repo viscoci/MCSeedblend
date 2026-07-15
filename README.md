@@ -13,6 +13,7 @@ SeedBlend is a server-side mod for Minecraft Java Edition. Stage a new seed with
 |---|---|---|---|
 | 1.21.1 | Fabric, NeoForge | 21 | `seedblend-<loader>-1.21.1-<version>.jar` |
 | 26.1.x | Fabric, NeoForge | 25 | `seedblend-<loader>-26.1-<version>.jar` (see `mc26.1/`) |
+| 26.2 | Fabric, NeoForge | 25 | `seedblend-<loader>-26.2-<version>.jar` (see `mc26.2/`) |
 
 One artifact per Minecraft version per loader — there is deliberately no universal JAR.
 
@@ -111,8 +112,9 @@ Please include: Minecraft version, loader + version, SeedBlend version, `latest.
 ## Building from source
 
 ```
-./gradlew build          # 1.21.1: fabric/build/libs + neoforge/build/libs
+./gradlew build                # 1.21.1: fabric/build/libs + neoforge/build/libs
 cd mc26.1 && ./gradlew build   # 26.1 artifacts
+cd mc26.2 && ./gradlew build   # 26.2 artifacts
 ```
 
 See `docs/` for architecture, chunk-metadata format, the reseed lifecycle, world-safety design, and the 1.21.1/26.1 source audits. License: MIT.

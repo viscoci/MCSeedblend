@@ -8,6 +8,7 @@ fabric/     Fabric entrypoint, command/lifecycle registration (Loom)
 neoforge/   NeoForge entrypoint, command/lifecycle registration (ModDevGradle)
 fixture/    Headless integration fixture (scripted dedicated-server reseed cycle)
 mc26.1/     Standalone Gradle build for the Minecraft 26.1 release line
+mc26.2/     Standalone Gradle build for the Minecraft 26.2 release line
 docs/       Architecture, source audits, safety/compatibility notes
 ```
 
@@ -35,6 +36,8 @@ powershell -File fixture/reseed-fixture.ps1                      # 1.21.1 Fabric
 powershell -File fixture/reseed-fixture.ps1 -Loader neoforge     # 1.21.1 NeoForge
 powershell -File fixture/reseed-fixture.ps1 -ProjectSubdir mc26.1 -JavaHome <jdk25>            # 26.1 Fabric
 powershell -File fixture/reseed-fixture.ps1 -Loader neoforge -ProjectSubdir mc26.1 -JavaHome <jdk25>  # 26.1 NeoForge
+powershell -File fixture/reseed-fixture.ps1 -ProjectSubdir mc26.2 -JavaHome <jdk25>            # 26.2 Fabric
+powershell -File fixture/reseed-fixture.ps1 -Loader neoforge -ProjectSubdir mc26.2 -JavaHome <jdk25>  # 26.2 NeoForge
 ```
 
 The integration fixture must pass on both loaders before a release: it drives plan →

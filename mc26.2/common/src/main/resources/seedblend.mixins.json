@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.bondigi.seedblend.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "mixins": [
+    "ChunkAccessMixin",
+    "ChunkMapMixin",
+    "SerializableChunkDataMixin",
+    "LevelChunkMixin",
+    "WorldGenSettingsAccessor"
+  ],
+  "server": [
+  ]
+}
