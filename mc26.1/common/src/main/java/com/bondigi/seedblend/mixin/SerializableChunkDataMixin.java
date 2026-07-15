@@ -39,6 +39,18 @@ public abstract class SerializableChunkDataMixin implements SeedBlendChunkDataAc
     @Unique
     @Nullable
     private DimensionBlendPolicy seedblend$policy;
+    @Unique
+    private int seedblend$transitionWeight;
+
+    @Override
+    public int seedblend$getTransitionWeight() {
+        return seedblend$transitionWeight;
+    }
+
+    @Override
+    public void seedblend$setTransitionWeight(int weightPercent) {
+        this.seedblend$transitionWeight = weightPercent;
+    }
 
     @Override
     public long seedblend$getEpoch() {
@@ -75,8 +87,10 @@ public abstract class SerializableChunkDataMixin implements SeedBlendChunkDataAc
         if (result == null || SeedBlendRuntime.state() == null) {
             return;
         }
-        ((SeedBlendChunkDataAccess) (Object) result)
-                .seedblend$setEpoch(ChunkNbtTransformer.readEpoch(chunkData));
+        SeedBlendChunkDataAccess access = (SeedBlendChunkDataAccess) (Object) result;
+        access.seedblend$setEpoch(ChunkNbtTransformer.readEpoch(chunkData));
+        access.seedblend$setTransitionWeight(chunkData.getCompoundOrEmpty(ChunkNbtKeys.SEEDBLEND)
+                .getIntOr(ChunkNbtKeys.TRANSITION_WEIGHT, 0));
     }
 
     @Inject(method = "read", at = @At("RETURN"))
@@ -87,10 +101,14 @@ public abstract class SerializableChunkDataMixin implements SeedBlendChunkDataAc
             return;
         }
         ProtoChunk result = cir.getReturnValue();
-        ((SeedBlendChunkEpochAccess) result).seedblend$setGenerationEpoch(seedblend$epoch);
+        SeedBlendChunkEpochAccess resultAccess = (SeedBlendChunkEpochAccess) result;
+        resultAccess.seedblend$setGenerationEpoch(seedblend$epoch);
+        resultAccess.seedblend$setTransitionWeight(seedblend$transitionWeight);
         if (result instanceof ImposterProtoChunk imposter) {
             // Full chunks round-trip as a wrapped LevelChunk; the wrapper is discarded.
-            ((SeedBlendChunkEpochAccess) imposter.getWrapped()).seedblend$setGenerationEpoch(seedblend$epoch);
+            SeedBlendChunkEpochAccess wrapped = (SeedBlendChunkEpochAccess) imposter.getWrapped();
+            wrapped.seedblend$setGenerationEpoch(seedblend$epoch);
+            wrapped.seedblend$setTransitionWeight(seedblend$transitionWeight);
         }
     }
 
@@ -114,6 +132,7 @@ public abstract class SerializableChunkDataMixin implements SeedBlendChunkDataAc
         SeedBlendChunkDataAccess access = (SeedBlendChunkDataAccess) (Object) cir.getReturnValue();
         access.seedblend$setEpoch(epoch);
         access.seedblend$setPolicy(DimensionPolicyFactory.of(level));
+        access.seedblend$setTransitionWeight(epochAccess.seedblend$getTransitionWeight());
     }
 
     @Inject(method = "write", at = @At("RETURN"))
@@ -124,6 +143,10 @@ public abstract class SerializableChunkDataMixin implements SeedBlendChunkDataAc
         }
         CompoundTag tag = cir.getReturnValue();
         ChunkNbtTransformer.ensureSeedBlendMetadata(tag, seedblend$epoch);
+        if (seedblend$transitionWeight > 0) {
+            tag.getCompound(ChunkNbtKeys.SEEDBLEND)
+                    .ifPresent(meta -> meta.putInt(ChunkNbtKeys.TRANSITION_WEIGHT, seedblend$transitionWeight));
+        }
 
         // Keep old completed chunks valid blending sources across save cycles.
         DimensionBlendPolicy policy = seedblend$policy;

@@ -41,11 +41,15 @@ public abstract class ChunkSerializerMixin {
             return;
         }
         long epoch = ChunkNbtTransformer.readEpoch(tag);
+        int transitionWeight = tag.getCompound(ChunkNbtKeys.SEEDBLEND).getInt(ChunkNbtKeys.TRANSITION_WEIGHT);
         ProtoChunk result = cir.getReturnValue();
         ((SeedBlendChunkEpochAccess) result).seedblend$setGenerationEpoch(epoch);
+        ((SeedBlendChunkEpochAccess) result).seedblend$setTransitionWeight(transitionWeight);
         if (result instanceof ImposterProtoChunk imposter) {
             // Full chunks round-trip as a wrapped LevelChunk; the wrapper is discarded.
-            ((SeedBlendChunkEpochAccess) imposter.getWrapped()).seedblend$setGenerationEpoch(epoch);
+            SeedBlendChunkEpochAccess wrapped = (SeedBlendChunkEpochAccess) imposter.getWrapped();
+            wrapped.seedblend$setGenerationEpoch(epoch);
+            wrapped.seedblend$setTransitionWeight(transitionWeight);
         }
     }
 
@@ -69,6 +73,10 @@ public abstract class ChunkSerializerMixin {
             SeedBlendRuntime.NEW_CHUNKS_ASSIGNED_EPOCH.increment();
         }
         ChunkNbtTransformer.ensureSeedBlendMetadata(tag, epoch);
+        int transitionWeight = epochAccess.seedblend$getTransitionWeight();
+        if (transitionWeight > 0) {
+            tag.getCompound(ChunkNbtKeys.SEEDBLEND).putInt(ChunkNbtKeys.TRANSITION_WEIGHT, transitionWeight);
+        }
 
         // Keep old completed chunks valid blending sources across save cycles.
         if (EpochPolicy.classify(epoch, runtime.activeEpoch()) == EpochPolicy.Classification.OLD

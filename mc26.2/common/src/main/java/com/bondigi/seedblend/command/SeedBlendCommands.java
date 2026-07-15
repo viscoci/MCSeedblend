@@ -109,7 +109,17 @@ public final class SeedBlendCommands {
         SeedBlendRuntimeState runtime = SeedBlendRuntime.state();
         out.append("Blending dimensions: ").append(runtime != null
                 ? String.join(", ", runtime.blendingDimensions())
-                : String.join(", ", SeedBlendRuntime.config().supportedDimensions));
+                : String.join(", ", SeedBlendRuntime.config().supportedDimensions)).append('\n');
+        if (runtime != null && !runtime.transitionDimensions().isEmpty()) {
+            out.append("Transition blending: ").append(runtime.transitionRange())
+                    .append(" chunks, biomes ").append(runtime.blendBiomes() ? "blended" : "not blended")
+                    .append(", in ").append(String.join(", ", runtime.transitionDimensions()));
+        } else {
+            var transition = SeedBlendRuntime.config().transition;
+            out.append("Transition blending: ").append(transition.enabled
+                    ? transition.clampedRange() + " chunks (active after first reseed)"
+                    : "disabled");
+        }
         reply(ctx, out.toString());
         return 1;
     }
@@ -261,6 +271,10 @@ public final class SeedBlendCommands {
         out.append("Considered old: ").append(cls == EpochPolicy.Classification.OLD ? "yes" : "no").append('\n');
         out.append("Blending data present: ").append(hasBlending ? "yes" : "no").append('\n');
         out.append("Synthetic blending would be injected on load: ").append(wouldInject ? "yes" : "no").append('\n');
+        int transitionWeight = tag.getCompoundOrEmpty(ChunkNbtKeys.SEEDBLEND)
+                .getIntOr(ChunkNbtKeys.TRANSITION_WEIGHT, 0);
+        out.append("Transition weight: ").append(transitionWeight).append("%")
+                .append(transitionWeight > 0 ? " (generated inside a seed-transition zone)" : "").append('\n');
         out.append("Blending sections: min ").append(policy.minSection())
                 .append(", max (exclusive) ").append(policy.maxSectionExclusive());
         reply(ctx, out.toString());
@@ -335,7 +349,8 @@ public final class SeedBlendCommands {
                 .append(" blendingInjected=").append(SeedBlendRuntime.SYNTHETIC_BLENDING_INJECTED.sum())
                 .append(" oldIncompleteDiscarded=").append(SeedBlendRuntime.OLD_INCOMPLETE_DISCARDED.sum())
                 .append(" newChunksStamped=").append(SeedBlendRuntime.NEW_CHUNKS_ASSIGNED_EPOCH.sum())
-                .append(" missingMetadata=").append(SeedBlendRuntime.CHUNKS_MISSING_METADATA.sum());
+                .append(" missingMetadata=").append(SeedBlendRuntime.CHUNKS_MISSING_METADATA.sum())
+                .append(" transitionChunks=").append(SeedBlendRuntime.TRANSITION_CHUNKS.sum());
 
         out.append(ok ? "\nResult: OK" : "\nResult: PROBLEMS FOUND");
         reply(ctx, out.toString());

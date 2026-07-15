@@ -9,6 +9,8 @@ public final class ChunkNbtKeys {
     public static final String SEEDBLEND = "seedblend";
     public static final String SCHEMA = "schema";
     public static final String GENERATION_EPOCH = "generation_epoch";
+    /** Max transition-blend weight (0-100) applied when this chunk generated. Diagnostic. */
+    public static final String TRANSITION_WEIGHT = "transition_weight";
     public static final int CURRENT_SCHEMA = 1;
 
     // Vanilla

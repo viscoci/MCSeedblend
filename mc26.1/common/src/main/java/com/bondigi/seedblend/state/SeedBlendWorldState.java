@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
  * thread before levels load or from command handlers, never from generation threads.
  */
 public final class SeedBlendWorldState {
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
     private int schemaVersion;
     private String worldFingerprint;
@@ -23,6 +23,13 @@ public final class SeedBlendWorldState {
     @Nullable
     private PendingTransaction pendingTransaction;
     private long lastSuccessfulStartupEpoch;
+    /**
+     * Schema 2: every epoch's seed, keyed by epoch (Gson maps keys as strings). Needed
+     * by transition blending so a boundary against an epoch-N chunk blends toward the
+     * terrain seed N actually used. Append-only.
+     */
+    @Nullable
+    private java.util.Map<String, Long> seedHistory;
 
     public SeedBlendWorldState(String worldFingerprint, long originalSeed) {
         this.schemaVersion = CURRENT_SCHEMA_VERSION;
@@ -34,6 +41,8 @@ public final class SeedBlendWorldState {
         this.previousSeed = null;
         this.pendingTransaction = null;
         this.lastSuccessfulStartupEpoch = 0L;
+        this.seedHistory = new java.util.TreeMap<>();
+        this.seedHistory.put("0", originalSeed);
     }
 
     public int schemaVersion() {
@@ -93,6 +102,33 @@ public final class SeedBlendWorldState {
         this.activeEpoch = applied.targetEpoch();
         this.lastSuccessfulStartupEpoch = applied.targetEpoch();
         this.pendingTransaction = null;
+        seedHistory().put(Long.toString(applied.targetEpoch()), applied.targetSeed());
+    }
+
+    /**
+     * Epoch → seed map, upgrading schema-1 files in place: epoch 0 and the active epoch
+     * are always reconstructible; the previous epoch when previousSeed was recorded.
+     * Older intermediate epochs from schema-1 multi-reseed histories are unknowable —
+     * transition blending falls back to vanilla blending against those chunks.
+     */
+    public java.util.Map<String, Long> seedHistory() {
+        if (seedHistory == null) {
+            seedHistory = new java.util.TreeMap<>();
+        }
+        seedHistory.putIfAbsent("0", originalSeed);
+        seedHistory.putIfAbsent(Long.toString(activeEpoch), activeSeed);
+        if (previousSeed != null && activeEpoch > 0) {
+            seedHistory.putIfAbsent(Long.toString(activeEpoch - 1), previousSeed);
+        }
+        if (schemaVersion < CURRENT_SCHEMA_VERSION) {
+            schemaVersion = CURRENT_SCHEMA_VERSION;
+        }
+        return seedHistory;
+    }
+
+    public java.util.OptionalLong seedForEpoch(long epoch) {
+        Long seed = seedHistory().get(Long.toString(epoch));
+        return seed != null ? java.util.OptionalLong.of(seed) : java.util.OptionalLong.empty();
     }
 
     public void markSuccessfulStartup() {
@@ -100,7 +136,7 @@ public final class SeedBlendWorldState {
     }
 
     public boolean isValid() {
-        return schemaVersion == CURRENT_SCHEMA_VERSION
+        return schemaVersion >= 1 && schemaVersion <= CURRENT_SCHEMA_VERSION
                 && worldFingerprint != null && !worldFingerprint.isEmpty()
                 && mode != null
                 && activeEpoch >= 0;

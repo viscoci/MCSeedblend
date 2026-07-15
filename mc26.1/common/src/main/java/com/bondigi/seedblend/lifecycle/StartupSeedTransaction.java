@@ -125,8 +125,18 @@ public final class StartupSeedTransaction {
         long effectiveEpoch = applying != null ? applying.targetEpoch() : state.activeEpoch();
         long effectiveSeed = applying != null ? applying.targetSeed() : state.activeSeed();
         Set<String> blendingDims = new HashSet<>(config.supportedDimensions);
+
+        java.util.Map<Long, Long> seedHistory = new java.util.HashMap<>();
+        state.seedHistory().forEach((epoch, seed) -> seedHistory.put(Long.parseLong(epoch), seed));
+        seedHistory.put(effectiveEpoch, effectiveSeed);
+
+        Set<String> transitionDims = config.transition.enabled
+                ? new HashSet<>(config.transition.dimensions)
+                : Set.of();
         SeedBlendRuntime.publish(new SeedBlendRuntimeState(
-                effectiveSeed, effectiveEpoch, state.mode(), blendingDims));
+                effectiveSeed, effectiveEpoch, state.mode(), blendingDims,
+                seedHistory, transitionDims, config.transition.clampedRange(),
+                config.transition.blendBiomes));
     }
 
     /**
@@ -191,11 +201,19 @@ public final class StartupSeedTransaction {
                 SeedBlend.LOGGER.info("[SeedBlend] Native blending enabled for {}", dim);
             }
         }
-        SeedBlend.LOGGER.info("[SeedBlend] Nether and End blending are disabled");
+        if (runtime != null && !runtime.transitionDimensions().isEmpty()) {
+            SeedBlend.LOGGER.info("[SeedBlend] Transition blending: {} chunks, biomes {}, dimensions: {}",
+                    runtime.transitionRange(), runtime.blendBiomes() ? "blended" : "not blended",
+                    String.join(", ", runtime.transitionDimensions()));
+        } else {
+            SeedBlend.LOGGER.info("[SeedBlend] Transition blending disabled");
+        }
+        SeedBlend.LOGGER.info("[SeedBlend] Vanilla blending_data injection remains Overworld-only");
         if (SeedBlendRuntime.config().warnOnUnsupportedDimensions) {
             for (ServerLevel level : server.getAllLevels()) {
                 String id = level.dimension().identifier().toString();
-                if (runtime != null && !runtime.isBlendingDimension(id) && level.dimension() != Level.OVERWORLD) {
+                if (runtime != null && !runtime.isBlendingDimension(id)
+                        && !runtime.isTransitionDimension(id) && level.dimension() != Level.OVERWORLD) {
                     SeedBlend.LOGGER.warn(
                             "[SeedBlend] Dimension {} is not blended; future chunks there still use the new seed",
                             id);

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0 — 2026-07-15
+
+- **Transition blending**: true old-seed → new-seed terrain interpolation over a
+  configurable range (`transition.rangeChunks`, 1..7, default 4), normalized smoothstep
+  weighting — seamless at the boundary, pure new seed at the range edge
+- **Nether and End blending** (and custom `minecraft:noise` dimensions via config):
+  transition blending needs no `blending_data`, so it works where vanilla blending
+  cannot; Nether/End still never receive synthetic vanilla blending metadata
+- Biome dithering across the transition zone (`transition.blendBiomes`)
+- Multi-reseed-aware: `seedHistory` in state.json (schema 2, auto-upgrades from 1)
+  blends each boundary toward the seed of the epoch actually behind it
+- Per-chunk `transition_weight` diagnostic in chunk NBT, `/seedblend inspect`, and a
+  `transitionChunks` counter in `/seedblend verify`
+- Fixture grew to 57 assertions including transition-weight normalization and Nether
+  epoch/transition coverage
+
 ## 0.1.0 — 2026-07-14
 
 Initial release.

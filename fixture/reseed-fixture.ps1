@@ -181,8 +181,10 @@ try {
     Wait-ServerReady $p
 
     # Guarantee a known epoch-0 area around chunk (0,0) regardless of where spawn is.
-    # forceload persists, so these chunks reload in every later phase.
+    # forceload persists, so these chunks reload in every later phase. Same for a
+    # Nether area, to exercise transition blending outside the Overworld.
     [void](Invoke-Server 'forceload add 0 0 144 144')
+    [void](Invoke-Server 'execute in minecraft:the_nether run forceload add 0 0 64 64')
     Start-Sleep -Seconds 15
     [void](Invoke-Server 'save-all flush')
 
@@ -220,10 +222,13 @@ try {
     Assert ($log -match 'Active generation seed: 222222') 'P2: startup summary reports seed B'
     Assert ($log -match 'Native blending enabled for minecraft:overworld') 'P2: overworld blending enabled'
 
-    # New chunks adjacent to the old area and far away (block coords; chunk = 16 blocks).
+    # New chunks adjacent to the old area (transition zone), a detached strip, and far
+    # away (block coords; chunk = 16 blocks). Nether strip adjacent to its old area.
+    [void](Invoke-Server 'forceload add 160 0 240 144')
     [void](Invoke-Server 'forceload add 256 0 400 144')
     [void](Invoke-Server 'forceload add 100000 100000 100016 100016')
-    Start-Sleep -Seconds 15
+    [void](Invoke-Server 'execute in minecraft:the_nether run forceload add 80 0 144 64')
+    Start-Sleep -Seconds 20
     [void](Invoke-Server 'save-all flush')
     Start-Sleep -Seconds 5
 
@@ -236,11 +241,37 @@ try {
     Assert ($out -match 'Serialized generation epoch: 1') 'P2: far new chunk stamped with epoch 1'
     Assert ($out -match 'Considered old: no') 'P2: far new chunk is current'
     Assert ($out -match 'Blending data present: no') 'P2: new chunk has no blending_data'
+    Assert ($out -match 'Transition weight: 0%') 'P2: far chunk generated with no transition weight'
+
+    # Transition zone. Note: forceload's entity-ticking ring promotes +2 chunks beyond
+    # the P1 strip to FULL, so old terrain extends through chunk 11; the first NEW
+    # chunk is 12, bordering old chunk 11 -> near-full old-seed weight (seamless side).
+    $out = Invoke-Server 'seedblend inspect chunk 12 5'
+    Assert ($out -match 'Serialized generation epoch: 1') 'P2: boundary chunk is epoch 1'
+    Assert ($out -match 'Transition weight: (100|[1-9][0-9]?)%') 'P2: boundary chunk generated inside the transition zone'
+    $m = [regex]::Match($out, 'Transition weight: (\d+)%')
+    Assert ([int]$m.Groups[1].Value -ge 90) 'P2: weight at the old boundary is near 100 (seamless side)'
+
+    # Normalization: weight decreases with distance from the boundary (range 4).
+    $out = Invoke-Server 'seedblend inspect chunk 14 5'
+    $m2 = [regex]::Match($out, 'Transition weight: (\d+)%')
+    Assert ($m2.Success -and [int]$m2.Groups[1].Value -gt 0) 'P2: mid-transition chunk has partial weight'
+    Assert ([int]$m2.Groups[1].Value -lt [int]$m.Groups[1].Value) 'P2: weight normalizes downward across the range'
+
+    # Nether: transition blending works without any blending_data.
+    $out = Invoke-Server 'seedblend inspect chunk 2 2 minecraft:the_nether'
+    Assert ($out -match 'Serialized generation epoch: 0') 'P2: old nether chunk kept epoch 0'
+    Assert ($out -match 'Considered old: yes') 'P2: old nether chunk classified old'
+    Assert ($out -match 'Blending data present: no') 'P2: nether never receives synthetic blending_data'
+    $out = Invoke-Server 'seedblend inspect chunk 7 2 minecraft:the_nether'
+    Assert ($out -match 'Serialized generation epoch: 1') 'P2: new nether chunk stamped epoch 1'
+    Assert ($out -match 'Transition weight: (100|[1-9][0-9]?)%') 'P2: nether boundary chunk transition-blended'
 
     $out = Invoke-Server 'seedblend verify'
     Assert ($out -match 'Result: OK') 'P2: verify reports OK'
     Assert ($out -match 'blendingInjected=[1-9]') 'P2: synthetic blending injected for loaded old chunks'
     Assert ($out -match 'oldCompleted=[1-9]') 'P2: old completed chunks identified'
+    Assert ($out -match 'transitionChunks=[1-9]') 'P2: transition chunks were generated'
 } finally { Stop-DevServer $p }
 
 $state = Get-State
@@ -264,6 +295,9 @@ try {
 
     $out = Invoke-Server 'seedblend inspect chunk 6250 6250'
     Assert ($out -match 'Serialized generation epoch: 1') 'P3: epoch 1 chunk persisted'
+
+    $out = Invoke-Server 'seedblend inspect chunk 12 5'
+    Assert ($out -match 'Transition weight: (100|[1-9][0-9]?)%') 'P3: transition weight persisted across restart'
 
     $out = Invoke-Server 'seedblend verify'
     Assert ($out -match 'Result: OK') 'P3: verify OK after restart'

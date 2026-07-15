@@ -11,4 +11,9 @@ public interface SeedBlendChunkEpochAccess {
     void seedblend$setGenerationEpoch(long epoch);
 
     boolean seedblend$hasAssignedGenerationEpoch();
+
+    /** Max transition weight (0-100) applied while generating this chunk; 0 = none. */
+    int seedblend$getTransitionWeight();
+
+    void seedblend$setTransitionWeight(int weightPercent);
 }

@@ -28,6 +28,7 @@ public final class SeedBlendRuntime {
     public static final LongAdder MALFORMED_METADATA = new LongAdder();
     public static final LongAdder UNSUPPORTED_GENERATORS = new LongAdder();
     public static final LongAdder FUTURE_EPOCH_REJECTED = new LongAdder();
+    public static final LongAdder TRANSITION_CHUNKS = new LongAdder();
 
     public static void publish(SeedBlendRuntimeState newState) {
         if (state != null) {
@@ -50,6 +51,8 @@ public final class SeedBlendRuntime {
         MALFORMED_METADATA.reset();
         UNSUPPORTED_GENERATORS.reset();
         FUTURE_EPOCH_REJECTED.reset();
+        TRANSITION_CHUNKS.reset();
+        com.bondigi.seedblend.transition.OldGenCache.clear();
     }
 
     /** @return the published state, or null when SeedBlend is passive (no reseed ever staged). */

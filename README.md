@@ -65,22 +65,23 @@ Epochs are immutable, classification happens as chunks load naturally — **no f
 
 ## What blends (and what doesn't)
 
-Blending is enabled by default only for `minecraft:overworld` with the vanilla noise generator.
+Two blending systems stack:
 
-**Not blended:** the Nether, the End, superflat worlds, debug worlds, and custom chunk generators that bypass vanilla blending. The new seed still applies to future chunks in those dimensions — the border just won't be smoothed. The plan command warns about this.
+**Transition blending** (default on — Overworld, Nether, End): SeedBlend generates true *transition chunks* across a configurable range (`rangeChunks`, default 4, max 7). Each column's terrain is interpolated between the old seed's generator and the new seed's generator with a normalized smoothstep weight — at the boundary the terrain equals the old seed exactly (seamless), fading to pure new-seed terrain across the range. Biomes dither between old and new across the zone. Works in any `minecraft:noise`-type dimension, including custom ones added to the config. See `docs/transition-blending.md`.
 
-Custom dimensions can opt in via `config/seedblend.json` (`supportedDimensions`) once you've verified their generator is vanilla-noise-based.
+**Vanilla blending** (`blending_data`, Overworld only): old chunks are additionally marked as native blending anchors, same as 1.18 world upgrades — the graceful floor wherever transition blending can't act (e.g. unknown old-epoch seeds).
+
+**Not blended:** superflat, debug worlds, and non-noise custom generators (warned in the log). Carvers and structures never blend across the boundary — see limitations.
 
 ## Known limitations
 
-Native blending naturalizes transitions; it does not merge worlds seamlessly. Expect:
+Transition blending naturalizes terrain, density caves, and biomes; it does not merge worlds seamlessly. Expect:
 
-- rivers and roads that don't line up across the boundary
-- caves/aquifers that connect imperfectly
+- carver caves/canyons (chunk-RNG driven) that may end abruptly at the boundary — cheese/noodle caves do blend
 - structures (villages, trails, modded structures) cut off at the boundary
-- visible biome transitions
+- rivers and roads that meet at plausible terrain but don't continue their path
+- feature placement (trees, ores) on transitional terrain uses the new seed
 - seed-dependent mechanics changing in existing chunks: slime chunks, future structure placement, anything that reads the world seed
-- unblended Nether/End boundaries
 - incompatibility with world generators that replace vanilla serialization or blending (a warning is logged)
 
 ## Removing the mod
@@ -99,7 +100,13 @@ Safe at any time. The world keeps its newest seed (it's in `level.dat` like any 
   "requirePlanToken": true,
   "warnOnUnsupportedDimensions": true,
   "allowCustomNoiseGenerators": false,
-  "diagnosticLogging": false
+  "diagnosticLogging": false,
+  "transition": {
+    "enabled": true,
+    "rangeChunks": 4,
+    "dimensions": ["minecraft:overworld", "minecraft:the_nether", "minecraft:the_end"],
+    "blendBiomes": true
+  }
 }
 ```
 

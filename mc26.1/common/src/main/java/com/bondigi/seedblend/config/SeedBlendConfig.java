@@ -28,6 +28,27 @@ public final class SeedBlendConfig {
     public boolean warnOnUnsupportedDimensions = true;
     public boolean allowCustomNoiseGenerators = false;
     public boolean diagnosticLogging = false;
+    public TransitionConfig transition = new TransitionConfig();
+
+    /**
+     * SeedBlend transition blending: dual-generator density interpolation across a
+     * configurable chunk range, normalized old-seed → new-seed. Unlike vanilla
+     * blending_data it needs no chunk metadata, so it also works in the Nether, the
+     * End, and custom noise dimensions.
+     */
+    public static final class TransitionConfig {
+        public boolean enabled = true;
+        /** Chunks of transition on the new side of a boundary. Clamped to 1..7 (vanilla worldgen-region guarantee). */
+        public int rangeChunks = 4;
+        public List<String> dimensions = List.of(
+                "minecraft:overworld", "minecraft:the_nether", "minecraft:the_end");
+        /** Blend biome selection across the transition (dithered by weight). */
+        public boolean blendBiomes = true;
+
+        public int clampedRange() {
+            return Math.max(1, Math.min(7, rangeChunks));
+        }
+    }
 
     /**
      * Loads the config, writing defaults if the file is absent. A malformed file is a

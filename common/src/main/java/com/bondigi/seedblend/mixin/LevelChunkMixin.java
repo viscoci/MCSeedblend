@@ -20,8 +20,12 @@ public abstract class LevelChunkMixin {
     private void seedblend$copyEpochFromProto(ServerLevel level, ProtoChunk protoChunk,
                                               LevelChunk.PostLoadProcessor postLoad, CallbackInfo ci) {
         SeedBlendChunkEpochAccess proto = (SeedBlendChunkEpochAccess) protoChunk;
+        SeedBlendChunkEpochAccess self = (SeedBlendChunkEpochAccess) this;
         if (proto.seedblend$hasAssignedGenerationEpoch()) {
-            ((SeedBlendChunkEpochAccess) this).seedblend$setGenerationEpoch(proto.seedblend$getGenerationEpoch());
+            self.seedblend$setGenerationEpoch(proto.seedblend$getGenerationEpoch());
+        }
+        if (proto.seedblend$getTransitionWeight() > 0) {
+            self.seedblend$setTransitionWeight(proto.seedblend$getTransitionWeight());
         }
     }
 }

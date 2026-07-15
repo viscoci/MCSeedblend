@@ -18,4 +18,8 @@ public interface SeedBlendChunkDataAccess {
 
     @Nullable
     DimensionBlendPolicy seedblend$getPolicy();
+
+    int seedblend$getTransitionWeight();
+
+    void seedblend$setTransitionWeight(int weightPercent);
 }

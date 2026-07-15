@@ -14,6 +14,8 @@ import org.spongepowered.asm.mixin.Unique;
 public abstract class ChunkAccessMixin implements SeedBlendChunkEpochAccess {
     @Unique
     private volatile long seedblend$generationEpoch = -1L;
+    @Unique
+    private volatile int seedblend$transitionWeight;
 
     @Override
     public long seedblend$getGenerationEpoch() {
@@ -28,5 +30,15 @@ public abstract class ChunkAccessMixin implements SeedBlendChunkEpochAccess {
     @Override
     public boolean seedblend$hasAssignedGenerationEpoch() {
         return seedblend$generationEpoch >= 0;
+    }
+
+    @Override
+    public int seedblend$getTransitionWeight() {
+        return seedblend$transitionWeight;
+    }
+
+    @Override
+    public void seedblend$setTransitionWeight(int weightPercent) {
+        this.seedblend$transitionWeight = weightPercent;
     }
 }
